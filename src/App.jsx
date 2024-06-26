@@ -9,7 +9,6 @@ import Header from "./components/Header";
 function App() {
   return (
     <>
-      <Header />
       <div
         style={{
           display: "flex",
@@ -17,8 +16,10 @@ function App() {
           alignItems: "center",
         }}
       >
-        <div style={{ width: '80%' }}>
+        <div style={{ width: '100%' }}>
           <BrowserRouter>
+            <Header />
+
             <Router />
           </BrowserRouter>
         </div>
