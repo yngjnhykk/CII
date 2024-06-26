@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import '../App.css';
 import axios from "axios";
 import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, XAxis, YAxis} from "recharts";
@@ -34,11 +34,20 @@ function App() {
     ethanol: false,
   });
 
-  // 감축 계수
-  const reductionFactor = [
-    2019, 2020, 2021, 2022, 2023, 2024, 2025
-  ]
+// 감축 계수
+const reductionFactor = {
+  2019: 0,
+  2020: 0.01,
+  2021: 0.02,
+  2022: 0.03,
+  2023: 0.05,
+  2024: 0.07,
+  2025: 0.09,
+  2026: 0.1
+}
 
+
+  // 체크박스 이벤트
   const handleCheckboxChange = (e) => {
     const {name, checked} = e.target;
     setFuelConsumption({
@@ -46,13 +55,14 @@ function App() {
     });
   };
 
-  // api 요청 양식
+  // api 요청 양식 초기화
   const [data, setData] = useState({
     imo_number: 1234568,
     ship_type: "Select Ship Type",
     summer_load_dwt: 0,
     gross_tonnage: 0,
     total_distance_travelled: 0,
+    reduction_factor : 0,
     fuels: {
       diesel_gas_oil_consumption: 0,
       heavy_fuel_oil_consumption: 0,
@@ -65,34 +75,47 @@ function App() {
     }
   })
 
-  const tempData = [
-    { Capacity: 6550, A: 16.05, B: 17.54, C: 18.66, D: 19.78, E: 22.02 },
-    { Capacity: 6620, A: 15.94, B: 17.43, C: 18.54, D: 19.65, E: 21.88 },
-    { Capacity: 6680, A: 15.86, B: 17.33, C: 18.44, D: 19.55, E: 21.76 },
-    { Capacity: 6750, A: 15.76, B: 17.22, C: 18.32, D: 19.42, E: 21.62 },
-    { Capacity: 6810, A: 15.67, B: 17.13, C: 18.22, D: 19.31, E: 21.50 },
-    { Capacity: 6880, A: 15.57, B: 17.01, C: 18.10, D: 19.19, E: 21.36 },
-    { Capacity: 6940, A: 15.49, B: 16.93, C: 18.01, D: 19.09, E: 21.25 },
-    { Capacity: 7010, A: 15.39, B: 16.82, C: 17.89, D: 18.96, E: 21.11 },
-    { Capacity: 7070, A: 15.31, B: 16.73, C: 17.80, D: 18.87, E: 21.00 },
-    { Capacity: 7140, A: 15.21, B: 16.63, C: 17.69, D: 18.75, E: 20.87 },
-    { Capacity: 7200, A: 15.14, B: 16.54, C: 17.60, D: 18.66, E: 20.77 },
-    { Capacity: 7270, A: 15.04, B: 16.44, C: 17.49, D: 18.54, E: 20.64 },
-    { Capacity: 7330, A: 14.96, B: 16.36, C: 17.40, D: 18.44, E: 20.53 },
-    { Capacity: 7400, A: 14.88, B: 16.26, C: 17.30, D: 18.34, E: 20.41 },
-    { Capacity: 7460, A: 14.80, B: 16.18, C: 17.21, D: 18.24, E: 20.31 },
-    { Capacity: 7530, A: 14.71, B: 16.08, C: 17.11, D: 18.14, E: 20.19 },
-    { Capacity: 7590, A: 14.65, B: 16.01, C: 17.03, D: 18.05, E: 20.10 },
-    { Capacity: 7660, A: 14.56, B: 15.91, C: 16.93, D: 17.95, E: 19.98 },
-    { Capacity: 7720, A: 14.49, B: 15.84, C: 16.85, D: 17.86, E: 19.88 },
-    { Capacity: 7790, A: 14.41, B: 15.75, C: 16.76, D: 17.77, E: 19.78 },
-    { Capacity: 7850, A: 14.34, B: 15.68, C: 16.68, D: 17.68, E: 19.68 },
-  ];
+  // 차트용 데이터
+  const [chartData, setChartData] = useState([]);
 
+  // cii 감축계수
+  const [rf, setRf] = useState(0)
 
   // cii 결과
-  const [ciiResult, setCiiResult] = useState({ required_cii : 0, attained_cii : 0, cii_grade : "", rate : {A : 0, B : 0, D : 0, E : 0}})
+  const [ciiResult, setCiiResult] = useState({ required_cii : 0, attained_cii : 0, cii_grade : "", rate : {A : 0, B : 0, D : 0, E : 0}, rateLine : {}, a : 0, b : 0})
 
+  // cii 결과 변경시(실행시)
+  useEffect(() => {
+
+    // 차트 데이터 초기화
+    setChartData([]);
+
+    // 라인 생성을 위한 임시 데이터
+    const tempData = [];
+
+    for(let i = -10; i <= 10; i++){
+      const reference = {};
+      if(data.ship_type === "Ro-Ro Cargo Ship (Vehicle Carrier)" || data.ship_type === "Ro-Ro Passenger Ship" || data.ship_type === "Cruise Passenger Ship"){
+        reference.Capacity = data.gross_tonnage + (data.gross_tonnage/110) * i;
+      }else{
+        reference.Capacity = Math.round(+data.summer_load_dwt + (Math.floor(data.summer_load_dwt/110)) * i);
+        reference.A = +(((1 - rf) * ciiResult.a * (reference.Capacity ** -ciiResult.c) * ciiResult.rateLine.A).toFixed(2))
+        reference.B = +(((1 - rf) * ciiResult.a * (reference.Capacity ** -ciiResult.c) * ciiResult.rateLine.B).toFixed(2))
+        reference.C = +(((1 - rf) * ciiResult.a * (reference.Capacity ** -ciiResult.c)).toFixed(2))
+        reference.D = +(((1 - rf) * ciiResult.a * (reference.Capacity ** -ciiResult.c) * ciiResult.rateLine.D).toFixed(2))
+        reference.E = +(((1 - rf) * ciiResult.a * (reference.Capacity ** -ciiResult.c) * ciiResult.rateLine.E).toFixed(2))
+      }
+      if(i === 0){
+        reference.required_cii = ciiResult.required_cii;
+        reference.attained_cii = ciiResult.attained_cii;
+      }
+
+      tempData.push(reference)
+    }
+    setChartData(tempData);
+  }, [ciiResult]);
+
+  // form change 이벤트
   const dataHandler = (e) => {
     const { name, value } = e.target;
     if (name in data.fuels) {
@@ -111,30 +134,33 @@ function App() {
     }
   };
 
+  // reduction_factor 이벤트 핸들러
+  const reductionFactorHandler = (e) => {
+      setRf(e.target.value)
+      setData({...data, reduction_factor: e.target.value})
+  };
+
   // 실행
   const execute = () => {
-
-    axios.post('http://118.129.145.21:1882/cii_test', data)
+    axios.post('http://118.129.145.21:1882/cii_simulator', data)
       .then((res) => {
         if(Object.entries(res.data.data).length > 1){
           setCiiResult(res.data.data)
         }
-        console.log(ciiResult)
       })
       .catch((err) => {
         console.log(err)
       });
-
   };
 
 
   return (<div className={"p-4"}>
     <h6 className={'text-3xl font-black mt-8 mb-12'}>[시뮬레이터]</h6>
-    <div className={'grid grid-cols-12 gap-4'}>
+    <div className={'grid grid-cols-12 gap-4 mb-20'}>
       <div className={'col-span-6'}>
         <h2 className="text-2xl font-bold mb-4">입력</h2>
         {/* 입력 섹션 */}
-        <div className="bg-white  border border-black p-6 rounded-lg">
+        <div className="bg-white  border border-black px-6 py-8 rounded-lg">
           {/* 선박 정보 */}
           <div className="mb-4">
             <h3 className="text-2xl font-semibold mb-4">선박 정보 (Ship Information)</h3>
@@ -142,7 +168,7 @@ function App() {
               <label className={'w-1/2 my-auto'}>선박 종류</label>
               <select name="ship_type" value={data.ship_type} onChange={dataHandler} className="w-1/2 py-2 ps-1 border rounded">
                 <option disabled hidden selected>Select Ship Type</option>
-                {shipType.map(item => <option>{item}</option>)}
+                {shipType.map((item, idx) => <option key={idx}>{item}</option>)}
               </select>
             </div>
             <div className={'flex mb-2'}>
@@ -159,7 +185,7 @@ function App() {
 
           {/* 연료 정보 */}
           <div className="mb-4">
-            <h3 className="text-2xl font-semibold mb-4">연료 정보 (Fuel Information)</h3>
+            <h3 className="text-2xl font-semibold mt-10 mb-4">연료 정보 (Fuel Information)</h3>
             <div className="flex mb-2">
               <input type="checkbox" className="mr-2" name="dieselGasOil" checked={fuelConsumption.dieselGasOil}
                      onChange={handleCheckboxChange}/>
@@ -220,12 +246,12 @@ function App() {
 
           {/* 항해 정보 */}
           <div className="mb-4">
-            <h3 className="text-2xl font-semibold mb-4">항해 정보 (Voyage Information)</h3>
+            <h3 className="text-2xl font-semibold mt-10 mb-4">항해 정보 (Voyage Information)</h3>
             <div className={'flex mb-2'}>
               <label className={'my-auto w-1/2'}>감축 계수 연도 (Reduction Factor)</label>
-              <select className="w-1/2 py-2 ps-1 mb-2 border rounded">
+              <select className="w-1/2 py-2 ps-1 mb-2 border rounded" onChange={reductionFactorHandler}>
                 <option disabled hidden selected>Select Year</option>
-                {reductionFactor.map(item => <option>{item}</option>)}
+                {Object.entries(reductionFactor).map(([k, v], idx) => <option key={idx} value={v}>{k}</option>)}
               </select>
             </div>
             <div className={'flex mb-2'}>
@@ -242,7 +268,8 @@ function App() {
       {/* 출력 섹션 */}
       <div className={'col-span-6'}>
         <h2 className="text-2xl font-bold mb-4">출력</h2>
-        <div className="bg-white p-6 rounded-lg border border-black">
+        <div className="bg-white px-6 py-8 rounded-lg border border-black">
+
           <div className="mb-4">
             <h3 className="text-2xl font-black mb-2">CII 정보 (CII Information)</h3>
             <div className="mb-2">
@@ -253,51 +280,54 @@ function App() {
               <label className="block">Attained CII</label>
               <input type="text"  value={ciiResult.attained_cii ? ciiResult.attained_cii : 0} className="w-full p-2 mb-2 border rounded text-center" readOnly/>
             </div>
+
+            {/* 레이팅 */}
             <div>
               <label className="block">Rating</label>
               <div className="w-full mb-2 border rounded grid grid-cols-12 text-center">
-                <div className={`col-span-4 ${ciiResult.cii_grade === "A" ? "bg-green-500 text-white font-black"  : "bg-green-100"} py-4 border`}>
+                <div className={`col-span-4 ${ciiResult.cii_grade === "A" ? "bg-green-500 text-white font-black"  : "bg-green-100"} py-3 border`}>
                   A
                 </div>
-                <div className={`col-span-8 ${ciiResult.cii_grade === "A" ? "bg-green-500 text-white font-black"  : ""} py-4 border`}>
+                <div className={`col-span-8 ${ciiResult.cii_grade === "A" ? "bg-green-500 text-white font-black"  : ""} py-3 border`}>
                   {ciiResult.rate.A}
                 </div>
-                <div className={`col-span-4 ${ciiResult.cii_grade === "B" ? "bg-blue-500 text-white font-black"  : "bg-blue-100"} py-4 border`}>
+                <div className={`col-span-4 ${ciiResult.cii_grade === "B" ? "bg-blue-500 text-white font-black"  : "bg-blue-100"} py-3 border`}>
                   B
                 </div>
-                <div className={`col-span-8 ${ciiResult.cii_grade === "B" ? "bg-blue-500 text-white font-black"  : ""} py-4 border`}>
+                <div className={`col-span-8 ${ciiResult.cii_grade === "B" ? "bg-blue-500 text-white font-black"  : ""} py-3 border`}>
                   {ciiResult.rate.B}
                 </div>
-                <div className={`col-span-4 ${ciiResult.cii_grade === "C" ? "bg-amber-500 text-white font-black"  : "bg-amber-100"} py-4 border`}>
+                <div className={`col-span-4 ${ciiResult.cii_grade === "C" ? "bg-amber-500 text-white font-black"  : "bg-amber-100"} py-3 border`}>
                 C
               </div>
-              <div className={`col-span-8 ${ciiResult.cii_grade === "C" ? "bg-amber-500 text-white font-black"  : ""} py-4 border`}>
+              <div className={`col-span-8 ${ciiResult.cii_grade === "C" ? "bg-amber-500 text-white font-black"  : ""} py-3 border`}>
                   {ciiResult.required_cii}
                 </div>
-                <div className={`col-span-4 ${ciiResult.cii_grade === "D" ? "bg-rose-300 text-white font-black"  : "bg-rose-100"} py-4 border`}>
+                <div className={`col-span-4 ${ciiResult.cii_grade === "D" ? "bg-rose-300 text-white font-black"  : "bg-rose-100"} py-3 border`}>
                   D
                 </div>
-                <div className={`col-span-8 ${ciiResult.cii_grade === "D" ? "bg-rose-300 text-white font-black"  : ""} py-4 border`}>
+                <div className={`col-span-8 ${ciiResult.cii_grade === "D" ? "bg-rose-300 text-white font-black"  : ""} py-3 border`}>
                   {ciiResult.rate.D}
                 </div>
                 <div
-                  className={`col-span-4 ${ciiResult.cii_grade === "E" ? "bg-red-500 text-white font-black"  : "bg-red-200"} py-4 border`}>
+                  className={`col-span-4 ${ciiResult.cii_grade === "E" ? "bg-red-500 text-white font-black"  : "bg-red-200"} py-3 border`}>
                   E
                 </div>
-                <div className={`col-span-8 ${ciiResult.cii_grade === "E" ? "bg-red-500 text-white font-black"  : ""} py-4 border`}>
+                <div className={`col-span-8 ${ciiResult.cii_grade === "E" ? "bg-red-500 text-white font-black"  : ""} py-3 border`}>
                   {ciiResult.rate.E}
                 </div>
               </div>
             </div>
           </div>
           <div>
+
           {/* 차트 (Chart) */}
-            <div className="w-full p-2 mb-2 border rounded h-96">
+            <div className="w-full mb-2 border rounded" style={{height : '46vh'}}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   width={500}
-                  height={'100%'}
-                  data={tempData}
+                  height={300}
+                  data={chartData}
                   margin={{
                     top: 5,
                     right: 30,
@@ -308,17 +338,28 @@ function App() {
                   {/* 격자선 설정 */}
                   <CartesianGrid strokeDasharray="3 3" />
                   {/* X축 설정 */}
-                  <XAxis dataKey="Capacity" label={{ value: 'Capacity', position: 'insideBottom', offset: -5,dx : -200, dy: 10 }} />
+                  <XAxis dataKey="Capacity" label={{ value: 'Capacity', position: 'insideBottom', offset: -5,dx : -300, dy: 10 }} />
                   {/* Y축 범위 설정 */}
-                  <YAxis domain={[12, 24]} label={{ value: 'Attained CII', angle: -90, position: 'insideLeft'}} />
+                  <YAxis domain={0} label={{ value: 'Attained CII', angle: -90, position: 'insideLeft'}} />
                   {/* 범례 설정 */}
                   <Legend iconType="circle" />
                   {/* 데이터 라인 설정 (A, B, C, D, E 각기 다른 색상) */}
-                  <Line type="monotone" dataKey="A" stroke="#8884d8" dot={false} />
-                  <Line type="monotone" dataKey="B" stroke="#82ca9d" dot={false} />
-                  <Line type="monotone" dataKey="C" stroke="#ffc658" dot={false} />
-                  <Line type="monotone" dataKey="D" stroke="#ff7300" dot={false} />
-                  <Line type="monotone" dataKey="E" stroke="#387908" dot={false} />
+                  <Line type="monotone" dataKey="A" stroke="#22C55E" dot={false} />
+                  <Line type="monotone" dataKey="B" stroke="#3B82F6" dot={false} />
+                  <Line type="monotone" dataKey="C" stroke="#F59E0B" dot={false} />
+                  <Line type="monotone" dataKey="D" stroke="#FDA4AF" dot={false} />
+                  <Line type="monotone" dataKey="E" stroke="#EF4444" dot={false} />
+                  <Line type="monotone" dataKey="required_cii" stroke="#f08605" />
+
+                  {/* cii_grade에 따라 색상 변경*/}
+                  <Line type="monotone" dataKey="attained_cii" stroke={`${
+                    ciiResult.cii_grade === "A" ? "#22C55E" 
+                      : ciiResult.cii_grade === "B" ? "#3B82F6"
+                        : ciiResult.cii_grade === "C" ? "#F59E0B"
+                          : ciiResult.cii_grade === "D" ? "#FDA4AF"
+                            : "#EF4444"
+                  }`}
+                  />
                 </LineChart>
               </ResponsiveContainer>
 
