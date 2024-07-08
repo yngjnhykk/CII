@@ -1,15 +1,10 @@
 import "./App.css";
 import { BrowserRouter } from "react-router-dom";
 import Router from "./Router";
-import Header from "./components/Header";
-
-
-
 
 function App() {
   return (
     <>
-      <Header />
       <div
         style={{
           display: "flex",
@@ -17,7 +12,10 @@ function App() {
           alignItems: "center",
         }}
       >
-        <div style={{ width: '80%' }}>
+        <div
+          style={{ width: 1176, fontFamily: "Pretendard" }}
+          className="bg-white"
+        >
           <BrowserRouter>
             <Router />
           </BrowserRouter>
