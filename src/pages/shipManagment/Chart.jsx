@@ -42,26 +42,33 @@ const data = [
   { Capacity: 75720, A: 3.52, B: 3.8, C: 4.09, D: 4.34, E: 4.83 },
   { Capacity: 76360, A: 3.5, B: 3.83, C: 4.07, D: 4.31, E: 4.8 },
 ];
-function Chart() {
+
+function Chart({ parsedShipData }) {
+  const chartData =
+    parsedShipData && parsedShipData[0] ? parsedShipData[0].chart_data : [];
+
   return (
     <div className="mt-20">
       <div className="text-[16px] mb-10">5. 선박운항탄소집약도 그래프</div>
       <div className="ml-[-50px]">
         <ResponsiveContainer width="103%" height={250}>
           <LineChart
-            data={data}
+            data={chartData}
             margin={{ top: 20, right: 50, left: 50, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="Capacity"
               label={{
-                value: "Deadweight or G/T",
+                value: "Capacity",
                 position: "insideBottom",
-                offset: 0,
+                offset: -5,
+                // dx: -300,
+                // dy: 10,
               }}
             />
             <YAxis
+              // domain={0}
               label={{
                 value: "Attained CII",
                 angle: -90,
@@ -70,11 +77,11 @@ function Chart() {
             />
             <Tooltip />
             <Legend verticalAlign="bottom" height={36} />
-            <Line type="monotone" dataKey="A" stroke="#8884d8" />
-            <Line type="monotone" dataKey="B" stroke="#82ca9d" />
-            <Line type="monotone" dataKey="C" stroke="#ffc658" />
-            <Line type="monotone" dataKey="D" stroke="#ff7300" />
-            <Line type="monotone" dataKey="E" stroke="#387908" />
+            <Line type="monotone" dataKey="A" stroke="#8884d8" dot={false} />
+            <Line type="monotone" dataKey="B" stroke="#82ca9d" dot={false} />
+            <Line type="monotone" dataKey="C" stroke="#ffc658" dot={false} />
+            <Line type="monotone" dataKey="D" stroke="#ff7300" dot={false} />
+            <Line type="monotone" dataKey="E" stroke="#387908" dot={false} />
             <Line name="Required CII" dataKey="required_cii" stroke="#F59E0B" />
             <Line name="Attained CII" dataKey="attained_cii" stroke="#10B981" />
           </LineChart>

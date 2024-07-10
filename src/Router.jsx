@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router";
-import Simulator from "./pages/Simulator";
 import MainPage from "./pages/shipManagment/ShipManagement";
+import Simulator from "./pages/simulator/Simulator";
 
 function Router() {
   return (
